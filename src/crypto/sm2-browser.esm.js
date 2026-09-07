@@ -1,0 +1,6 @@
+import { sm2 } from '@noble/curves/sm2';
+import { sha256 } from '@noble/hashes/sha256';
+const h2b=h=>{const b=new Uint8Array(h.length/2);for(let i=0;i<h.length;i+=2)b[i/2]=parseInt(h.substring(i,i+2),16);return b};
+const b2h=b=>Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');
+var SM2Browser={generateKeypair(){const p=sm2.utils.randomPrivateKey();const u=sm2.getPublicKey(p);return{privateKey:b2h(p),publicKey:'04'+b2h(u.slice(1))}},encrypt(pub,msg){return b2h(sm2.encrypt(h2b(pub),new TextEncoder().encode(msg)))},decrypt(priv,ct){return new TextDecoder().decode(sm2.decrypt(h2b(priv),h2b(ct)))},sign(priv,msg){return b2h(sm2.sign(sha256(new TextEncoder().encode(msg)),h2b(priv)))},verify(pub,sig,msg){return sm2.verify(h2b(sig),sha256(new TextEncoder().encode(msg)),h2b(pub))},getPublicFromPrivate(priv){const u=sm2.getPublicKey(h2b(priv));return'04'+b2h(u.slice(1))},selftest(){const k=this.generateKeypair();const m='FIBEMATE-SM2-'+Date.now();const ct=this.encrypt(k.publicKey,m);if(this.decrypt(k.privateKey,ct)!==m)return{ok:false,err:'enc/dec'};const s=this.sign(k.privateKey,m);if(!this.verify(k.publicKey,s,m))return{ok:false,err:'sign/verify'};return{ok:true,publicKey:k.publicKey.slice(0,20)+'...'}}};
+if(typeof window!=='undefined')window.SM2Browser=SM2Browser;

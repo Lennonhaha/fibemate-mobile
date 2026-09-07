@@ -39,3 +39,15 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# build artifacts & debug
+/dist-test
+/dist-web
+screenshot-*.png
+e2e-headless.js
+
+# historical dev logs (kept out of repo)
+RUN.md
+start-expo.ps1
+keys-mojibake-fix_2026-07-09.md
+sm2-encrypt-decrypt-closed_2026-07-09.md
