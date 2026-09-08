@@ -26,26 +26,11 @@ export type IdentityMaterial = {
   createdAt: string;
 };
 
-// ---- Base64url helpers (Hermes-safe, no btoa/atob) ----
-
-function hexToBase64url(hex: string): string {
-  const binary = hex.match(/.{1,2}/g)!.map(b => String.fromCharCode(parseInt(b, 16))).join('');
-  const b64 = btoa(binary);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64urlToHex(b64url: string): string {
-  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = b64 + '=='.slice(0, (4 - b64.length % 4) % 4);
-  const binary = atob(padded);
-  return Array.from(binary).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
-}
-
 function uint8ArrayToBase64url(arr: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
   const b64 = btoa(binary);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]+$/, '');
 }
 
 // ---- SM2 key generation ----

@@ -54,17 +54,9 @@ const OPK_STORAGE_KEY = 'fibemate_opk_pool';
 function uint8ArrayToBase64url(arr: Uint8Array): string {
   const bin = Array.from(arr).map(b => String.fromCharCode(b)).join('');
   const b64 = btoa(bin);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]+$/, '');
 }
 
-/** hex → Uint8Array */
-function hexToUint8Array(hex: string): Uint8Array {
-  const arr = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    arr[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return arr;
-}
 
 // ========================
 // OPK 密钥对生成

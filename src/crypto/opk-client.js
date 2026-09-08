@@ -43,12 +43,12 @@ async function generateOPKKeyPair() {
   // 导出公钥 (raw 32 bytes → base64url)
   const rawPub = await crypto.subtle.exportKey('raw', kp.publicKey);
   const pubB64 = btoa(String.fromCharCode(...new Uint8Array(rawPub)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]+$/, '');
 
   // 导出私钥 (raw 32 bytes → base64url)
   const rawPriv = await crypto.subtle.exportKey('raw', kp.privateKey);
   const privB64 = btoa(String.fromCharCode(...new Uint8Array(rawPriv)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]+$/, '');
 
   // keyId: 前 16 字节 SHA-256 → hex
   const keyId = await sha256Hex(rawPub).then(h => h.substring(0, 16));

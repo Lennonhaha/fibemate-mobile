@@ -11,7 +11,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput,
+  View, Text, StyleSheet, TextInput,
   TouchableOpacity, ActivityIndicator, Alert, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,7 +40,6 @@ export default function MessageScreen() {
 
   // ---- 后端连接 ----
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'online' | 'offline'>('offline');
-  const [myUserId, setMyUserId] = useState('');
 
   // ---- 发送 ----
   const [recipientName, setRecipientName] = useState('');
@@ -76,7 +75,6 @@ export default function MessageScreen() {
     try {
       setBackendStatus('connecting');
       const r = await RegClient.init(username, id.sm2.publicKey);
-      setMyUserId(r.userId);
       setBackendStatus('online');
       console.log('[RegClient] Online:', r.userId);
 
@@ -110,7 +108,7 @@ export default function MessageScreen() {
       setRecipientUserId(r.userId);
       setRecipientPubKeyCache(r.identityKey);
       console.log('[Lookup]', name, '→', r.userId);
-    } catch (_) {
+    } catch {
       setRecipientUserId('');
       setRecipientPubKeyCache('');
     }
@@ -158,7 +156,7 @@ export default function MessageScreen() {
         if (msg.plaintext) return msg;
         try {
           return { ...msg, plaintext: sm2.doDecrypt(msg.ciphertext, myPrivKey) };
-        } catch (_) {
+        } catch {
           return { ...msg, plaintext: '[解密失败 — 不是发给你的]' };
         }
       });
