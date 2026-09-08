@@ -69,7 +69,7 @@ function connect(): Promise<WebSocket> {
             _pendingRequests.delete(key);
             res(data);
           }
-        } catch (_) { /* ignore parse errors */ }
+        } catch { /* ignore parse errors */ }
       };
       ws.onclose = () => {
         _ws = null;
@@ -97,7 +97,7 @@ async function register(ws: WebSocket, username: string): Promise<{ userId: stri
       const id = JSON.parse(raw);
       privKey = id.sm2?.privateKey || '';
     }
-  } catch (_) {}
+  } catch {} 
 
   const identityKey = privKey || 'anon-' + Date.now();
   const r = await send(ws, { type: 'register', username, identityKey });
@@ -112,7 +112,7 @@ function startPolling(ws: WebSocket) {
     if (!_userId || ws.readyState !== WebSocket.OPEN) return;
     try {
       await send(ws, { type: 'poll', userId: _userId });
-    } catch (_) {}
+    } catch {} 
   }, 3000);
 }
 
@@ -195,7 +195,7 @@ export async function pollMessages(): Promise<InboxMsg[]> {
   try {
     const r = await send(ws, { type: 'poll', userId: _userId });
     return r.messages || [];
-  } catch (_) {
+  } catch {
     return [];
   }
 }
