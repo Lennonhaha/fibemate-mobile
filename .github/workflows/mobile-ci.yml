@@ -1,0 +1,55 @@
+name: Mobile CI (fibemate-mobile / Expo)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-type-test:
+    name: Lint + Type-check + Test (Expo)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Expo doctor (advisory, non-blocking)
+        continue-on-error: true
+        env:
+          EXPO_NO_TELEMETRY: "1"
+        run: npx expo-doctor
+
+      - name: Unit tests (no tests yet -> pass)
+        run: npx jest --passWithNoTests
+
+      - name: Advisory - PQC dependency alignment (non-blocking)
+        if: always()
+        shell: bash
+        run: |
+          node -e '
+            const p = require("./package.json");
+            const v = (p.dependencies && p.dependencies["@noble/curves"]) || (p.devDependencies && p.devDependencies["@noble/curves"]) || "absent";
+            const CANON = "2.2.0";
+            console.log("[@noble/curves] repo version:", v, "| backend canonical:", CANON);
+            if (v !== CANON) {
+              console.log("ADVISORY: @noble/curves drifts from backend canonical " + CANON + ". Align when convenient (P2).");
+            } else {
+              console.log("OK: aligned with backend canonical.");
+            }
+          '
