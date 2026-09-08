@@ -11,7 +11,7 @@
  *   - @react-native-async-storage → 密钥持久化
  */
 
-import { x25519 } from '@noble/curves/ed25519';
+import { x25519 } from '@noble/curves/ed25519.js';
 import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uint8ArrayToHex } from './utils';
