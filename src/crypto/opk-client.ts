@@ -151,7 +151,7 @@ export async function clearOPKPool(): Promise<void> {
 // ========================
 
 export type OPKServiceConfig = {
-  baseUrl: string;       // API 基地址，如 http://8.156.77.68
+  baseUrl: string;       // API 基地址，如 https://api.example.com（实际地址由部署配置注入）
   getToken: () => Promise<string | null>;
 };
 
