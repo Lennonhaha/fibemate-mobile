@@ -1,0 +1,58 @@
+# ============================================================
+# NEW FILE: Lennonhaha/fibemate-mobile  .github/dependabot.yml
+# ============================================================
+# 该仓库此前【无】dependabot.yml（Dependabot 用隐式默认：每次 bump = 1 PR，
+# 无 groups / 无 ignore / 无 labels）——这就是此前 PR #12 / #14 死锁的根因。
+# 本文件为其首次引入，配套 .github/workflows/dependabot-auto-merge.yml。
+#
+# 关键点：image-size 在 package-lock.json 中由 metro 引入（1.2.1），
+# 漏洞区间 <= 2.0.2【无上游补丁】，故以 ignore 标注。
+# 注意：用 YAML 注释记录理由（Dependabot schema 不支持 `reason:` 字段）；
+# 该 ignore 是"已知漏洞的显式压制"，必须在 dossier §7 + security-limitations 中记录，
+# 不得静默绕过（详见 workspace 草稿 dependabot-auto-merge-drafts_20260912.md）。
+# ============================================================
+
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels:
+      - "dependencies"
+      - "automerge"
+    # image-size: 1.2.1 pinned in package-lock.json (pulled by metro,
+    # node_modules/metro -> image-size@^1.0.2). Vulnerable range is
+    # <= 2.0.2 with NO upstream fix as of 2026-09 (ICNS/JXL/HEIF parsers).
+    # No safe pin exists (every version <= 2.0.2 is affected). Tracked via
+    # GHSA; ignore the major bump and revisit when upstream patches land.
+    # This is a deliberate suppress — documented in dossier §7 + security-limitations.
+    ignore:
+      - dependency-name: "image-size"
+        update-types: ["version-update:semver-major"]
+    groups:
+      mobile-deps:
+        applies-to: version-updates
+        patterns:
+          - "react-native*"
+          - "@react-native/*"
+          - "expo*"
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
+      dev-deps:
+        applies-to: version-updates
+        patterns:
+          - "eslint*"
+          - "prettier*"
+          - "typescript"
+        update-types:
+          - "minor"
+          - "patch"
