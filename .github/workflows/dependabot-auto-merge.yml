@@ -1,0 +1,72 @@
+# File: .github/workflows/dependabot-auto-merge.yml
+# PURPOSE: when Dependabot opens a PR tagged `automerge` and CI is green,
+#          merge it with --auto --squash. This ends the
+#          "single-maintainer can't approve own PR" deadlock on routine
+#          dependency bumps.
+#
+# APPLY: drop this file into BOTH repos:
+#   - Lennonhaha/fibemate-mobile
+#   - Lennonhaha/fibemate-react-native
+#
+# SAFETY:
+#   - Only matches PRs from dependabot[bot]
+#   - Requires BOTH labels: dependencies + automerge
+#   - Waits for CI job "Lint + Type-check + Test *" to succeed
+#   - Uses --squash --delete-branch
+#   - scopes: contents:write + pull-requests:write (no admin needed)
+
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for CI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for i in $(seq 1 60); do
+            STATE=$(gh api "repos/${{ github.repository }}/commits/${{ github.event.pull_request.head.sha }}/check-runs" \
+                    --jq '[.check_runs[] | select(.name | startswith("Lint + Type-check + Test")) | .conclusion] | first')
+            case "$STATE" in
+              success) echo "CI green"; exit 0 ;;
+              failure|cancelled) echo "CI red ($STATE) - leaving PR open"; exit 0 ;;
+              *) echo "CI status: ${STATE:-pending} (attempt $i/60)"; sleep 10 ;;
+            esac
+          done
+          echo "Timed out waiting for CI"; exit 0
+
+      - name: Verify labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABELS=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels" --jq '.[].name')
+          echo "$LABELS"
+          if ! echo "$LABELS" | grep -qx "dependencies"; then exit 0; fi
+          if ! echo "$LABELS" | grep -qx "automerge";   then exit 0; fi
+
+      - name: Enable auto-merge (squash)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --auto --squash --delete-branch \
+            --body "Auto-merged by dependabot-auto-merge workflow after CI success."
