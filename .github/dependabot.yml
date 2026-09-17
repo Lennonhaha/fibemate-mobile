@@ -36,6 +36,14 @@ updates:
     ignore:
       - dependency-name: "image-size"
         update-types: ["version-update:semver-major"]
+      # eslint 8 -> 10: major breaking (flat config migration required).
+      # Closed PR #27. Revisit when .eslintrc.js is migrated to eslint.config.js.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # typescript 6 -> 7: major breaking. Closed PR #28.
+      # Revisit after upgrading expo/tsconfig.base compatibility.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       mobile-deps:
         applies-to: version-updates
