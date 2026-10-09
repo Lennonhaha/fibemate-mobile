@@ -1,0 +1,57 @@
+# FIBEMATE mobile — CodeQL（草稿，2026-10-10）
+#
+# 背景：tauri 仓已有 .github/workflows/codeql.yml（含 javascript-typescript + rust + actions），
+# 但 mobile 仓（PR #47 所在仓）workflows 只有 dependabot-auto-merge.yml + mobile-ci.yml → **无 CodeQL**。
+# 本草稿只加 javascript-typescript，独立 PR 推，不混进 #47。
+#
+# 推送前必须确认两件事（本仓当前未核实）：
+#   1) PR #47 所在仓到底是 fibemate-mobile 还是 fibemate-react-native（两份 mobile 项目别混）；
+#   2) 该仓的默认分支名（main 还是 master）与是否已有 .github/workflows 目录。
+# 落地位置：<mobile 仓>/.github/workflows/codeql.yml
+#
+# 参照 tauri 仓 codeql.yml 的风格：workflow 名与 job 名分离，job 无 name: 时
+# required_status_checks 用的就是顶层 name（此处顶层 name = "CodeQL"）。
+
+name: CodeQL
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '27 3 * * 1'   # 每周一 03:27 UTC 全量扫描
+
+permissions:
+  contents: read
+  security-events: write   # 上传 SARIF 到 code scanning
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # 不用 paths: [...] 白名单：本仓源码在 src/ 且有根级 App.tsx / index.ts，
+          # 白名单会漏掉根级文件；只做 paths-ignore，其余交给 CodeQL 自动识别。
+          config: |
+            paths-ignore:
+              - node_modules
+              - dist
+              - dist-test
+              - dist-web
+              - android
+              - ios
+              - .expo
+              - '**/*.min.js'
+              - '**/*.bundle.js'
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
