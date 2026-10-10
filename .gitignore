@@ -51,3 +51,8 @@ RUN.md
 start-expo.ps1
 keys-mojibake-fix_2026-07-09.md
 sm2-encrypt-decrypt-closed_2026-07-09.md
+
+# local backups (never commit)
+*.bak
+*.bak-*
+*.bak.*
