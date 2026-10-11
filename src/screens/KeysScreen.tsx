@@ -115,7 +115,7 @@ export default function KeysScreen() {
 
             {/* Storage & OPK */}
             <Text style={styles.sectionTitle}>其他</Text>
-            <InfoCard label="安全存储" value="设备硬件（SecureStore）" />
+            <InfoCard label="密钥存储" value="AsyncStorage（未加密）" />
             <InfoCard label="预密钥" value={opkCount > 0 ? `✅ ${opkCount} 个 OPK` : '待实现（OPK 池）'} />
             <InfoCard label="TSR 存证" value="LG-001 ~ LG-058" />
 
