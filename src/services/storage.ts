@@ -10,7 +10,10 @@ const KEYS = {
 
 /**
  * Cross-platform key storage.
- * Uses expo-secure-store on native (iOS/Android), AsyncStorage on web.
+ * NOTE: key material is currently persisted to AsyncStorage on BOTH native and
+ * web - unencrypted and NOT hardware-backed. expo-secure-store is declared in
+ * package.json but is not wired up yet; do not describe this store as a
+ * hardware keystore until that lands.
  * On web: warning shown but still functional for development.
  */
 export const SecureKeyStore = {
