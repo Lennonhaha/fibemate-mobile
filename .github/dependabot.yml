@@ -10,6 +10,17 @@
 # 注意：用 YAML 注释记录理由（Dependabot schema 不支持 `reason:` 字段）；
 # 该 ignore 是"已知漏洞的显式压制"，必须在 dossier §7 + security-limitations 中记录，
 # 不得静默绕过（详见 workspace 草稿 dependabot-auto-merge-drafts_20260912.md）。
+#
+# --- 2026-10-14 (P2): Expo SDK-managed deps are ignored here -------------
+# Root cause of the #25 / #32 / #53 dependency churn: Dependabot has no
+# knowledge of the Expo SDK 57 version matrix, so it kept bumping packages
+# OFF-matrix (expo-crypto 57.0.4 -> 58.0.5, react 19.2.3 -> 19.3.0,
+# react-dom -> 19.3.0, react-native 0.86.3 -> 0.87.1, react-native-web
+# 0.21.3 -> 0.21.4). Every one of those re-conflicted the dependency PRs
+# and left main off-matrix (see PR #57).
+# The SDK matrix is owned by `npx expo install`; those packages are ignored
+# here and enforced in CI by `npx expo install --check`
+# (see .github/workflows/mobile-ci.yml).
 # ============================================================
 
 version: 2
@@ -27,13 +38,27 @@ updates:
     labels:
       - "dependencies"
       - "automerge"
-    # image-size: 1.2.1 pinned in package-lock.json (pulled by metro,
-    # node_modules/metro -> image-size@^1.0.2). Vulnerable range is
-    # <= 2.0.2 with NO upstream fix as of 2026-09 (ICNS/JXL/HEIF parsers).
-    # No safe pin exists (every version <= 2.0.2 is affected). Tracked via
-    # GHSA; ignore the major bump and revisit when upstream patches land.
-    # This is a deliberate suppress — documented in dossier §7 + security-limitations.
     ignore:
+      # ---- Expo SDK-managed packages (versioned by `npx expo install`) ----
+      # Dependabot cannot know the SDK matrix; any bump it opens for these
+      # drifts off-matrix. Leave them to `npx expo install --fix` and the
+      # CI gate `npx expo install --check`.
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+      - dependency-name: "@react-native-async-storage/*"
+      - dependency-name: "@types/react"
+      # image-size: 1.2.1 pinned in package-lock.json (pulled by metro,
+      # node_modules/metro -> image-size@^1.0.2). Vulnerable range is
+      # <= 2.0.2 with NO upstream fix as of 2026-09 (ICNS/JXL/HEIF parsers).
+      # No safe pin exists (every version <= 2.0.2 is affected). Tracked via
+      # GHSA; ignore the major bump and revisit when upstream patches land.
+      # This is a deliberate suppress — documented in dossier §7 + security-limitations.
       - dependency-name: "image-size"
         update-types: ["version-update:semver-major"]
       # eslint 8 -> 10: major breaking (flat config migration required).
@@ -45,13 +70,14 @@ updates:
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
     groups:
-      mobile-deps:
+      # Remaining non-SDK runtime deps that are still safe to bump on their
+      # own cadence (expo/react-native/* are ignored above).
+      runtime-deps:
         applies-to: version-updates
         patterns:
-          - "react-native*"
-          - "@react-native/*"
-          - "expo*"
-          - "@types/*"
+          - "@react-navigation/*"
+          - "@noble/curves"
+          - "sm-crypto"
         update-types:
           - "minor"
           - "patch"
