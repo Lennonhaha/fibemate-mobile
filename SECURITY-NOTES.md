@@ -1,0 +1,76 @@
+# Security notes — advisories present in the lock file with no upstream fix
+
+This file records dependency advisories that are **present in this repository's
+lock file and cannot be resolved by upgrading**, so they are not silently
+ignored. Each entry names the advisory, the dependency path, why no fix is
+available, and whether the code is reachable from the app.
+
+Last reviewed: 2026-10-14, against `expo@57.0.28` / `react-native@0.86.3`.
+
+## Summary
+
+`npm audit --json` reports **15** "high" entries for this project. They map to
+**two** root advisories (below); the remaining entries are propagation through
+the Expo / React Native toolchain — their `via` chains resolve to these two.
+GitHub Dependabot reports the same two, as alerts **#47** (node-forge) and
+**#48** (braces).
+
+Both are **bundler / CLI-side**: neither appears in the app's import graph
+(see "Reachability evidence"), so neither is part of the shipped app bundle.
+
+## 1. braces — GHSA-vfj7-8cjw-p6xm / CVE-2026-93687
+
+| | |
+|---|---|
+| Vulnerable range | `<= 3.0.3` |
+| Registry latest | 3.0.3 |
+| `first_patched_version` | `null` (no released fix) |
+| Path in this tree | `expo -> @expo/metro -> metro-file-map -> micromatch -> braces@3.0.3` |
+| Upstream | micromatch/braces#70 (open) |
+
+Uncontrolled recursion (CWE-674): a deeply nested brace pattern exhausts the
+call stack and terminates the process.
+
+## 2. node-forge — GHSA-86w9-cpqp-85rv / CVE-2026-85393
+
+| | |
+|---|---|
+| Vulnerable range | `<= 1.4.0` |
+| Registry latest | 1.4.0 |
+| `first_patched_version` | `null` (no released fix) |
+| Path in this tree | `expo -> @expo/cli -> @expo/code-signing-certificates -> node-forge@1.4.0` |
+| Upstream | digitalbazaar/forge#1149 (open), PR #1152 (open, not merged) |
+
+RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm
+elements (CWE-347); an incomplete fix for CVE-2026-33894.
+
+## Reachability evidence
+
+```
+# node_modules is not tracked, so the denominator is clean
+git ls-files | grep -c node_modules        # -> 0
+
+# no tracked file outside the lock file references these packages
+git grep -n -e node-forge -e braces -e code-signing-certificates -- .
+#   -> 10 lines, all in package-lock.json; 0 outside it
+
+# control: proves the search actually works
+git grep -n -e expo-crypto -- .            # -> 7 lines
+```
+
+App entry: `index.ts` -> `App.tsx` -> `src/**`, which imports `expo-crypto` and
+`expo-secure-store` only. Metro bundles from the import graph, so the
+CLI/bundler-side packages above are not included.
+
+`npm ls --omit=dev braces node-forge` still lists both: they sit in the
+production dependency tree (under `expo`), not in `devDependencies`. The claim
+here is *reachability*, not dependency type.
+
+## Exit criteria
+
+Delete the matching entry once a fixed version is published and installed:
+
+- `braces > 3.0.3`
+- `node-forge > 1.4.0`
+
+Then re-run `npm audit --json` and confirm the two advisories are gone.
