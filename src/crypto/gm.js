@@ -13,6 +13,9 @@
  *   - SM3 代替 SHA-256
  */
 
+// Centralized CSPRNG (fail-closed). See src/crypto/entropy.js.
+const entropy = require('./entropy.js');
+
 const MessageGM = (() => {
   'use strict';
 
@@ -99,12 +102,8 @@ const MessageGM = (() => {
   // ============================================================
   const AEGM = {
     randomHex(len) {
-      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        const buf = new Uint8Array(len);
-        crypto.getRandomValues(buf);
-        return bytesToHex(buf);
-      }
-      return gm().randomHex(len);
+      // Routed to the centralized CSPRNG (fail-closed); no weak fallback.
+      return entropy.randomHex(len);
     },
 
     // KDF: SM3(masterKey∥"gm-enc") → encKey, SM3(masterKey∥"gm-mac") → macKey
@@ -202,7 +201,9 @@ const MessageGM = (() => {
 
     // 生成 128-bit SM4 session key
     _sm4SessionKey = AEGM.randomHex(16);
-    _sessionId = `gm_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Session id: Date.now() is a readable label only (no entropy);
+    // the random segment comes from the centralized CSPRNG.
+    _sessionId = `gm_${Date.now()}_${entropy.randomHex(8)}`;
     _sessionState = SESSION_ACTIVE;
 
     // SM2 加密 session key → 发送给服务器
@@ -220,7 +221,7 @@ const MessageGM = (() => {
 
   function setSessionKey(sm4Key) {
     _sm4SessionKey = sm4Key;
-    _sessionId = `gm_direct_${Date.now()}`;
+    _sessionId = `gm_direct_${Date.now()}_${entropy.randomHex(8)}`;
     _sessionState = SESSION_ACTIVE;
   }
 

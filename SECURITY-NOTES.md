@@ -3,7 +3,8 @@
 This file records dependency advisories that are **present in this repository's
 lock file and cannot be resolved by upgrading**, so they are not silently
 ignored. Each entry names the advisory, the dependency path, why no fix is
-available, and whether the code is reachable from the app.
+available, and whether the code is reachable from the app. §3 records a
+**vendored-source** risk instead (not a lock-file advisory).
 
 Last reviewed: 2026-10-14, against `expo@57.0.28` / `react-native@0.86.3`.
 
@@ -74,3 +75,22 @@ Delete the matching entry once a fixed version is published and installed:
 - `node-forge > 1.4.0`
 
 Then re-run `npm audit --json` and confirm the two advisories are gone.
+
+## 3. Vendored `jsbn` SecureRandom — weak-randomness fallback
+
+Not a lock-file advisory: this is **vendored source** committed to the repo, so
+no dependency upgrade changes it. Recorded on 2026-10-15 because it is the same
+class of defect as the CodeQL alert `js/insecure-randomness` fixed in
+`src/crypto/gm.js` (alert #1); it is deliberately **out of scope** for that fix
+and tracked separately.
+
+| | |
+|---|---|
+| Files | `src/crypto/sm2-browser.bundle.js`, `src/crypto/sm2-browser.cjs.js` (minified builds of `jsbn`) |
+| Site | the `SecureRandom` seed pool: when `window.crypto` is unavailable the pool is filled from `Math.random()`; `millerRabin` also picks bases with `Math.random()` |
+| Trigger | only when WebCrypto (`window.crypto.getRandomValues`) is unavailable |
+| Impact if triggered | SM2 key material / signature nonces drawn from a non-cryptographic PRNG |
+| Reachability | the jsbn-based SM2 path (`sm2-browser*`). The app also ships `expo-crypto`, so WebCrypto is normally present — treated as a **latent** risk |
+| Status | **open — tracked separately** (vendor bundle; not covered by the entropy-centralization change) |
+| Exit criteria | a patched vendor build whose `SecureRandom` is fail-closed, or routing SM2 randomness through `src/crypto/entropy.js` |
+
