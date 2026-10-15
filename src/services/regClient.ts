@@ -11,6 +11,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SecureKeyStore } from './storage';
 
 const WS_URL = 'wss://fibemate.net/reg/ws';
 const STORAGE_KEY_USERID = 'fibemate_reg_userId';
@@ -89,17 +90,23 @@ function connect(): Promise<WebSocket> {
 
 // ---- init/register ----
 async function register(ws: WebSocket, username: string): Promise<{ userId: string; username: string }> {
-  // Generate a deterministic identity key from stored identity
+  // Identity material is loaded from the secure store (fail-closed):
+  // a storage or migration failure propagates and aborts registration
+  // instead of silently falling back to an anonymous identity.
+  const raw = await SecureKeyStore.loadIdentity();
+  if (!raw) {
+    throw new Error('[RegClient] identity unavailable; registration aborted');
+  }
   let privKey = '';
   try {
-    const raw = await AsyncStorage.getItem('fibemate_identity');
-    if (raw) {
-      const id = JSON.parse(raw);
-      privKey = id.sm2?.privateKey || '';
-    }
-  } catch {} 
-
-  const identityKey = privKey || 'anon-' + Date.now();
+    privKey = JSON.parse(raw)?.sm2?.privateKey || '';
+  } catch {
+    privKey = '';
+  }
+  if (!privKey) {
+    throw new Error('[RegClient] identity key material unavailable; registration aborted');
+  }
+  const identityKey = privKey;
   const r = await send(ws, { type: 'register', username, identityKey });
   if (!r.ok) throw new Error(r.error || 'register failed');
   return { userId: r.userId, username };

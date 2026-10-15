@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator,
+  ActivityIndicator, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SecureKeyStore } from '../services/storage';
@@ -11,6 +11,11 @@ import {
 import {
   getLocalOPKCount, initOPKPool,
 } from '../crypto/opk-client';
+
+const STORAGE_LABEL =
+  Platform.OS === 'web'
+    ? '仅内存（Web 不落盘）'
+    : '系统安全存储 · 分片（iOS Keychain / Android Keystore）';
 
 type GenState = 'idle' | 'generating' | 'done' | 'error';
 
@@ -115,7 +120,7 @@ export default function KeysScreen() {
 
             {/* Storage & OPK */}
             <Text style={styles.sectionTitle}>其他</Text>
-            <InfoCard label="密钥存储" value="AsyncStorage（未加密）" />
+            <InfoCard label="密钥存储" value={STORAGE_LABEL} />
             <InfoCard label="预密钥" value={opkCount > 0 ? `✅ ${opkCount} 个 OPK` : '待实现（OPK 池）'} />
             <InfoCard label="TSR 存证" value="LG-001 ~ LG-058" />
 
