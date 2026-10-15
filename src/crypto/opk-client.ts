@@ -8,12 +8,12 @@
  * 依赖：
  *   - @noble/curves/ed25519 → x25519 （纯 JS，Hermes 兼容）
  *   - expo-crypto → getRandomBytesAsync （Hermes 安全的随机数）
- *   - @react-native-async-storage → 密钥持久化
+ *   - SecureOPKStore (expo-secure-store, sharded) → 密钥持久化
  */
 
 import { x25519 } from '@noble/curves/ed25519.js';
 import * as Crypto from 'expo-crypto';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SecureOPKStore, KeyStoreError } from '../services/storage';
 import { uint8ArrayToHex } from './utils';
 
 // ========================
@@ -43,8 +43,6 @@ export const OPK_CONFIG = {
   MIN_THRESHOLD: 20,
   BATCH_SIZE: 50,
 } as const;
-
-const OPK_STORAGE_KEY = 'fibemate_opk_pool';
 
 // ========================
 // 工具函数
@@ -101,26 +99,26 @@ export async function generateOPKBatch(count: number = OPK_CONFIG.BATCH_SIZE): P
 }
 
 // ========================
-// 本地存储（AsyncStorage）
+// 本地存储（expo-secure-store）
 // ========================
 
-/** 保存一批 OPK 私钥到 AsyncStorage */
+/** 保存一批 OPK 私钥到 expo-secure-store */
 export async function storeOPKBatch(opks: OPKeyPair[]): Promise<void> {
   const existing = await loadOPKPool();
   for (const opk of opks) {
     existing[opk.keyId] = opk.privateKeyHex;
   }
-  await AsyncStorage.setItem(OPK_STORAGE_KEY, JSON.stringify(existing));
+  await SecureOPKStore.savePool(JSON.stringify(existing));
 }
 
 /** 加载整个 OPK 池 */
 export async function loadOPKPool(): Promise<Record<string, string>> {
-  const raw = await AsyncStorage.getItem(OPK_STORAGE_KEY);
+  const raw = await SecureOPKStore.loadPool();
   if (!raw) return {};
   try {
     return JSON.parse(raw);
-  } catch {
-    return {};
+  } catch (e) {
+    throw new KeyStoreError('shard_corrupt', 'OPK pool payload is unreadable: ' + String(e));
   }
 }
 
@@ -131,7 +129,7 @@ export async function consumeLocalOPK(keyId: string): Promise<string | null> {
   if (!privHex) return null;
 
   delete pool[keyId];
-  await AsyncStorage.setItem(OPK_STORAGE_KEY, JSON.stringify(pool));
+  await SecureOPKStore.savePool(JSON.stringify(pool));
   return privHex;
 }
 
@@ -143,7 +141,7 @@ export async function getLocalOPKCount(): Promise<number> {
 
 /** 清空本地 OPK 池 */
 export async function clearOPKPool(): Promise<void> {
-  await AsyncStorage.removeItem(OPK_STORAGE_KEY);
+  await SecureOPKStore.deletePool();
 }
 
 // ========================
