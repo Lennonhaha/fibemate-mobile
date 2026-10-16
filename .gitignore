@@ -56,3 +56,5 @@ sm2-encrypt-decrypt-closed_2026-07-09.md
 *.bak
 *.bak-*
 *.bak.*
+# interop harness (CI cross-repo checkout)
+/vendor/
