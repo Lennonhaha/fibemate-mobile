@@ -33,7 +33,6 @@ export default function MessageScreen() {
   const insets = useSafeAreaInsets();
 
   // ---- 身份 ----
-  const [myPubKey, setMyPubKey] = useState('');
   const [myPrivKey, setMyPrivKey] = useState('');
   const [myUsername, setMyUsername] = useState('');
   const [hasIdentity, setHasIdentity] = useState(false);
@@ -63,7 +62,6 @@ export default function MessageScreen() {
       return;
     }
     const id = deserializeIdentity(raw);
-    setMyPubKey(id.sm2.publicKey);
     setMyPrivKey(id.sm2.privateKey);
     setHasIdentity(true);
 
@@ -108,7 +106,10 @@ export default function MessageScreen() {
       setRecipientUserId(r.userId);
       setRecipientPubKeyCache(r.identityKey);
       console.log('[Lookup]', name, '→', r.userId);
-    } catch {
+    } catch (e: any) {
+      // No usable peer key: keep both fields empty so the send path blocks
+      // instead of falling back to a key of our own.
+      console.warn('[Lookup] rejected:', name, e?.message);
       setRecipientUserId('');
       setRecipientPubKeyCache('');
     }
@@ -128,9 +129,13 @@ export default function MessageScreen() {
 
     setEncLoading(true);
     try {
-      // 1) SM2 加密：用收件人公钥 → 只有对方能用自己的私钥解密
-      const targetPubKey = recipientPubKeyCache || myPubKey;
-      const ct = sm2.doEncrypt(plaintext, targetPubKey);
+      // 1) SM2 加密：必须用收件人公钥 → 只有对方能用自己的私钥解密。
+      //    拿不到有效公钥就阻止发送；绝不回退到自己的公钥（那等于发给自己，对方解不开）。
+      if (!recipientPubKeyCache) {
+        Alert.alert('无法发送', '未取得对方有效公钥，已阻止发送');
+        return;
+      }
+      const ct = sm2.doEncrypt(plaintext, recipientPubKeyCache);
       setCiphertext(ct);
 
       // 2) 发送到后端

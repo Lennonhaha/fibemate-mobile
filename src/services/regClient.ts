@@ -3,7 +3,7 @@
  * 
  * Protocol: wss://fibemate.net/reg/ws
  * 
- * register(username, identityKey)   → { ok, userId }
+ * register(username, identityKey)   → { ok, userId }   (identityKey = SM2 public key, 130 hex)
  * upload-opk(userId, opks[])        → { ok, count }
  * fetch-opk(userId)                 → { ok, opk }
  * send(from, to, ciphertext)        → { ok, msgId }
@@ -12,6 +12,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SecureKeyStore } from './storage';
+import { isSm2PublicKeyHex } from './sm2KeyFormat';
 
 const WS_URL = 'wss://fibemate.net/reg/ws';
 const STORAGE_KEY_USERID = 'fibemate_reg_userId';
@@ -97,16 +98,21 @@ async function register(ws: WebSocket, username: string): Promise<{ userId: stri
   if (!raw) {
     throw new Error('[RegClient] identity unavailable; registration aborted');
   }
-  let privKey = '';
+  // Only the SM2 *public* key is registered. The contribution key (identityKey)
+  // is what peers cache and encrypt to, so the private scalar must never leave
+  // the device — it is deliberately not read here at all.
+  let identityKey = '';
   try {
-    privKey = JSON.parse(raw)?.sm2?.privateKey || '';
+    identityKey = JSON.parse(raw)?.sm2?.publicKey || '';
   } catch {
-    privKey = '';
+    identityKey = '';
   }
-  if (!privKey) {
-    throw new Error('[RegClient] identity key material unavailable; registration aborted');
+  if (!isSm2PublicKeyHex(identityKey)) {
+    throw new Error(
+      '[RegClient] identity has no valid SM2 public key; registration aborted ' +
+      '(private key material is never transmitted)'
+    );
   }
-  const identityKey = privKey;
   const r = await send(ws, { type: 'register', username, identityKey });
   if (!r.ok) throw new Error(r.error || 'register failed');
   return { userId: r.userId, username };
@@ -208,10 +214,16 @@ export async function pollMessages(): Promise<InboxMsg[]> {
 }
 
 // Lookup user by username → { userId, username, identityKey }
+// The returned identityKey is validated to be an SM2 public key before it is
+// handed out: records written by older clients may hold something else, and
+// encrypting to a non-public key produces ciphertext nobody can open.
 export async function lookupUser(username: string): Promise<{ userId: string; username: string; identityKey: string }> {
   const ws = await connect();
   const r = await send(ws, { type: 'lookup', username });
   if (!r.ok) throw new Error(r.error || 'user not found');
+  if (!isSm2PublicKeyHex(r.identityKey)) {
+    throw new Error('[RegClient] peer identity key is not a valid SM2 public key; refusing to use it');
+  }
   return { userId: r.userId, username: r.username, identityKey: r.identityKey };
 }
 
