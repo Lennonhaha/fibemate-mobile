@@ -3,8 +3,9 @@
 This file records dependency advisories that are **present in this repository's
 lock file and cannot be resolved by upgrading**, so they are not silently
 ignored. Each entry names the advisory, the dependency path, why no fix is
-available, and whether the code is reachable from the app. §3 records a
-**vendored-source** risk instead (not a lock-file advisory).
+available, and whether the code is reachable from the app. §3 and §4 are not
+lock-file advisories: §3 is a **vendored-source** risk, §4 an application-level
+fix (with an open server-side half).
 
 Last reviewed: 2026-10-14, against `expo@57.0.28` / `react-native@0.86.3`.
 
@@ -93,4 +94,33 @@ and tracked separately.
 | Reachability | the jsbn-based SM2 path (`sm2-browser*`). The app also ships `expo-crypto`, so WebCrypto is normally present — treated as a **latent** risk |
 | Status | **open — tracked separately** (vendor bundle; not covered by the entropy-centralization change) |
 | Exit criteria | a patched vendor build whose `SecureRandom` is fail-closed, or routing SM2 randomness through `src/crypto/entropy.js` |
+
+## 4. SM2 private key published as the registered identity key — client-side interception
+
+Application-level defect, not a dependency advisory. Recorded on 2026-10-17
+(issue `#68`). The fix is **client-side interception only**: the wire protocol
+and the server are unchanged, and nothing here is a claim about peer identity.
+
+| | |
+|---|---|
+| Site (before) | `src/services/regClient.ts` read `identity` → `sm2.privateKey` and published it as the `identityKey` field of `register`; `lookupUser` handed the stored value straight back out |
+| Consumer | `src/screens/MessageScreen.tsx` cached it as the peer's encryption key, and fell back to **its own** public key (`recipientPubKeyCache \|\| myPubKey`) when the lookup failed |
+| Fixed | `register` publishes `sm2.publicKey` and fails closed unless it is an uncompressed SM2 public point (`04 ‖ X ‖ Y`, 130 hex); `regClient.ts` no longer reads `sm2.privateKey` at all; `lookupUser` validates the returned key before handing it out; the send path blocks instead of encrypting to a key of our own |
+| Status | **open on the server side** — `Lennonhaha/fibemate#263` (the reg-server stores and returns `identityKey` without validating it, and the field's role is still undefined) |
+| Residual risk | records written before this fix hold a private key, so peers cannot encrypt to them; `init()` skips `register` when a local `fibemate_reg_userId` exists, so existing installs do not re-publish a public key. Migration (client re-register vs server-side rewrite) is undecided |
+
+### Evidence
+
+```
+# the private key is gone from the registration client (same command, control file still hits)
+git grep -n privateKey -- src/services/regClient.ts   # -> 0 lines (rc=1)
+git grep -n privateKey -- src/services/keyService.ts  # -> control: hits
+
+# shape tests + source guards run under the node:test gate
+node --no-warnings --test test/*.node.cjs             # -> 49 pass / 0 fail
+```
+
+`test/sm2key-format.node.cjs` pins the two shapes and asserts against the client
+sources that `regClient.ts` never reads `sm2.privateKey` and that
+`MessageScreen.tsx` keeps the no-fallback send guard.
 
