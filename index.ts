@@ -1,3 +1,6 @@
+// Must stay the first import: it installs `globalThis.crypto.getRandomValues`
+// (native CSPRNG via expo-crypto) before App -> screens -> sm-crypto load.
+import './src/polyfills/crypto';
 import { registerRootComponent } from 'expo';
 import App from './App';
 
