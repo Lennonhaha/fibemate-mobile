@@ -90,3 +90,33 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # ----------------------------------------------------------------------
+  # GitHub Actions are pinned to full commit SHAs in .github/workflows/*
+  # (see the codeql / dco / interop / mobile-ci workflows). Without this
+  # entry Dependabot never proposes a bump for them, so the pins silently
+  # age. This entry makes the pinned SHAs trackable again: Dependabot opens
+  # a PR when the referenced tag moves, and the pin comment tells the
+  # reviewer which release the new SHA corresponds to.
+  #
+  # Deliberately NOT labelled `automerge`: unlike the npm bumps below, a
+  # moved action SHA changes what runs in CI, so these PRs wait for human
+  # review instead of being auto-merged by dependabot-auto-merge.yml.
+  # ----------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
