@@ -115,8 +115,14 @@ updates:
       - "dependencies"
     groups:
       github-actions:
+        # Major bumps are grouped on purpose. Dependabot treats
+        # github/codeql-action/init and .../analyze as separate dependencies,
+        # and CodeQL requires every codeql-action step in a workflow to run the
+        # same version - if a major update were left out of the group the two
+        # steps would land in two different PRs and both would fail to analyze.
         patterns:
           - "*"
         update-types:
+          - "major"
           - "minor"
           - "patch"
