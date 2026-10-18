@@ -7,7 +7,7 @@ available, and whether the code is reachable from the app. §3 and §4 are not
 lock-file advisories: §3 is a **vendored-source** risk, §4 an application-level
 fix (with an open server-side half).
 
-Last reviewed: 2026-10-14, against `expo@57.0.28` / `react-native@0.86.3`.
+Last reviewed: 2026-10-18, against `expo@57.0.30` / `react-native@0.86.3`.
 
 ## Summary
 
@@ -77,23 +77,42 @@ Delete the matching entry once a fixed version is published and installed:
 
 Then re-run `npm audit --json` and confirm the two advisories are gone.
 
-## 3. Vendored `jsbn` SecureRandom — weak-randomness fallback
+## 3. Vendored `jsbn` SecureRandom — unreachable; the live SM2 path is fail-closed
 
 Not a lock-file advisory: this is **vendored source** committed to the repo, so
 no dependency upgrade changes it. Recorded on 2026-10-15 because it is the same
 class of defect as the CodeQL alert `js/insecure-randomness` fixed in
-`src/crypto/gm.js` (alert #1); it is deliberately **out of scope** for that fix
-and tracked separately.
+`src/crypto/gm.js` (alert #1).
+
+**Correction (2026-10-17, #63 / #75).** The original framing — "the SM2 path
+silently falls back to `Math.random`" — does not hold for the dependency
+actually in use:
+
+- `sm-crypto@0.5.7` (installed) is **fail-closed**: with `globalThis.crypto`
+  removed, importing its SM2 module throws at load time
+  (`当前环境不支持 crypto.getRandomValues！`). With a stub `getRandomValues` the
+  module loads and `Math.random` is called **0** times — the jsbn pool is present
+  but not on the SM2 call path.
+- The real defect was that **no entropy source was wired at all** on React
+  Native. Fixed in #75: `src/polyfills/crypto.ts` installs a native
+  `globalThis.crypto.getRandomValues` (backed by `expo-crypto`) before
+  `App -> screens -> sm-crypto` are evaluated. The installer never overwrites a
+  usable `getRandomValues`, rejects a broken source, and fails closed.
+- The `Math.random`-backed pool below still exists, but only inside files that
+  nothing imports.
 
 | | |
 |---|---|
-| Files | `src/crypto/sm2-browser.bundle.js`, `src/crypto/sm2-browser.cjs.js` (minified builds of `jsbn`) |
+| Files | `src/crypto/sm2-browser.bundle.js` (39,782 B), `src/crypto/sm2-browser.cjs.js` (39,731 B) — minified jsbn builds; no importer |
 | Site | the `SecureRandom` seed pool: when `window.crypto` is unavailable the pool is filled from `Math.random()`; `millerRabin` also picks bases with `Math.random()` |
-| Trigger | only when WebCrypto (`window.crypto.getRandomValues`) is unavailable |
-| Impact if triggered | SM2 key material / signature nonces drawn from a non-cryptographic PRNG |
-| Reachability | the jsbn-based SM2 path (`sm2-browser*`). The app also ships `expo-crypto`, so WebCrypto is normally present — treated as a **latent** risk |
-| Status | **open — tracked separately** (vendor bundle; not covered by the entropy-centralization change) |
-| Exit criteria | a patched vendor build whose `SecureRandom` is fail-closed, or routing SM2 randomness through `src/crypto/entropy.js` |
+| Live path | **not this code.** The app's SM2 calls go to `sm-crypto` directly; `sm-crypto@0.5.7` is fail-closed and, since #75, always finds a real `getRandomValues` |
+| Latent risk | none in the shipped bundle: the files are unreachable and outside the app's import graph. They are the last tracked `Math.random` hits in `src/` |
+| Status | **closed client-side** — #63 closed on 2026-10-18 on the strength of #75; the vendored files moved into the browser-only retirement scope of `#69` (scope extended 2026-10-18) |
+| Exit criteria | `git grep -c --untracked Math.random -- src` reports no tracked source hits, i.e. the two bundles are deleted and the eslint exclusion at `.eslintrc.js:21` goes with them |
+
+#63 is closed because the security-relevant defect (the missing entropy source)
+is fixed by #75. What remains is dead-code removal, tracked in #69; the
+grep-based exit criterion above is deliberately left unmet until that lands.
 
 ## 4. SM2 private key published as the registered identity key — client-side interception
 
