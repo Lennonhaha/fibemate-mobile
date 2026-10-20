@@ -8,11 +8,19 @@ import type { LegacyBackend, ShardBackend, ShardStore } from './shardStore';
 
 export { KeyStoreError };
 
+/*
+ * Policy: AsyncStorage holds non-secret configuration only. Anything that is
+ * key material -- identity, one-time pre-keys, and especially ratchet/session
+ * state -- goes through SecureKeyStore / SecureOPKStore, which are sharded
+ * over expo-secure-store. There is deliberately no session-blob API in this
+ * module: a double-ratchet store must be built on the secure path, not on
+ * plaintext AsyncStorage, and #76 tracks that work.
+ */
+
 const KEYS = {
   IDENTITY: 'fibemate_identity',
   PREKEYS: 'fibemate_prekeys',
   OPK_POOL: 'fibemate_opk_pool',
-  SESSIONS: 'fibemate_sessions',
   SETTINGS: 'fibemate_settings',
 };
 
@@ -193,34 +201,11 @@ export function _resetStoresForTest(): void {
 
 /**
  * Non-secret session / config storage.
+ *
+ * Removed in #76. This used to expose `storeSessions` / `loadSessions`, which
+ * wrote session state as JSON to plaintext AsyncStorage. It had no callers,
+ * and the double-ratchet store that will need it is expected to carry message
+ * keys, so keeping the shape around was a loaded gun rather than a
+ * convenience. Non-secret configuration belongs in a dedicated config module
+ * with no session-shaped API; secrets belong in SecureKeyStore.
  */
-export const LocalStore = {
-  async set(key: string, value: any): Promise<void> {
-    await AsyncStorage.setItem(key, JSON.stringify(value));
-  },
-
-  async get<T>(key: string): Promise<T | null> {
-    const raw = await AsyncStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  },
-
-  async remove(key: string): Promise<void> {
-    await AsyncStorage.removeItem(key);
-  },
-
-  async storeSessions(sessions: any[]): Promise<void> {
-    await AsyncStorage.setItem(KEYS.SESSIONS, JSON.stringify(sessions));
-  },
-
-  async loadSessions<T>(): Promise<T[]> {
-    const raw = await AsyncStorage.getItem(KEYS.SESSIONS);
-    return raw ? JSON.parse(raw) : [];
-  },
-
-  async clearAll(): Promise<void> {
-    const keys = Object.values(KEYS);
-    for (const k of keys) {
-      await AsyncStorage.removeItem(k);
-    }
-  },
-};

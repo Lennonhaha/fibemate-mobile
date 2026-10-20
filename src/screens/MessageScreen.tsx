@@ -19,6 +19,7 @@ import sm2 from 'sm-crypto/dist/sm2';
 import { SecureKeyStore } from '../services/storage';
 import { deserializeIdentity } from '../services/keyService';
 import * as RegClient from '../services/regClient';
+import { ensureOpkPool } from '../services/opkService';
 import { Platform } from 'react-native';
 
 // ---- 收消息类型 ----
@@ -76,8 +77,10 @@ export default function MessageScreen() {
       setBackendStatus('online');
       console.log('[RegClient] Online:', r.userId);
 
-      // 上传 OPK（用 SM2 公钥）
-      const opks = [id.sm2.publicKey];
+      // Real one-time pre-keys (#68): fresh SM2 keypairs, public halves only.
+      // The identity key must not double as a pre-key: it is neither one-time
+      // nor per-session.
+      const opks = await ensureOpkPool();
       await RegClient.uploadOpks(opks);
       console.log('[RegClient] OPK uploaded');
     } catch (e: any) {
