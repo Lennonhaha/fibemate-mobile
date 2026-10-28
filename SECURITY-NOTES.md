@@ -103,16 +103,16 @@ actually in use:
 
 | | |
 |---|---|
-| Files | `src/crypto/sm2-browser.bundle.js` (39,782 B), `src/crypto/sm2-browser.cjs.js` (39,731 B) — minified jsbn builds; no importer |
+| Files | `src/crypto/sm2-browser.bundle.js` (39,782 B), `src/crypto/sm2-browser.cjs.js` (39,731 B) — minified jsbn builds; **deleted 2026-10-28**, recoverable from git history |
 | Site | the `SecureRandom` seed pool: when `window.crypto` is unavailable the pool is filled from `Math.random()`; `millerRabin` also picks bases with `Math.random()` |
 | Live path | **not this code.** The app's SM2 calls go to `sm-crypto` directly; `sm-crypto@0.5.7` is fail-closed and, since #75, always finds a real `getRandomValues` |
 | Latent risk | none in the shipped bundle: the files are unreachable and outside the app's import graph. They are the last tracked `Math.random` hits in `src/` |
-| Status | **closed client-side** — #63 closed on 2026-10-18 on the strength of #75; the vendored files moved into the browser-only retirement scope of `#69` (scope extended 2026-10-18) |
-| Exit criteria | `git grep -c --untracked Math.random -- src` reports no tracked source hits, i.e. the two bundles are deleted and the eslint exclusion at `.eslintrc.js:21` goes with them |
+| Status | **closed client-side** — #63 closed on 2026-10-18 on the strength of #75; the vendored files were deleted on 2026-10-28 with the rest of the browser-only set (#69) |
+| Exit criteria | **met on 2026-10-28** — the two bundles and the eslint exclusion are gone; `test/dead-crypto.node.cjs` now fails if any source file reintroduces `Math.random(` |
 
 #63 is closed because the security-relevant defect (the missing entropy source)
-is fixed by #75. What remains is dead-code removal, tracked in #69; the
-grep-based exit criterion above is deliberately left unmet until that lands.
+is fixed by #75. The dead-code removal landed under #69 on 2026-10-28, so the
+grep-based exit criterion above is now met and enforced by a test.
 
 ## 4. SM2 private key published as the registered identity key — client-side interception
 
