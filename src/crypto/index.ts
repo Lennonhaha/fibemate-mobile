@@ -13,7 +13,6 @@
 import * as SLHDSA from './slh-dsa.js';
 
 export { default as MLKEM768 } from './ml-kem-768.js';
-export { default as SM2 } from './sm2-browser.js';
 export { default as SM3 } from './sm3-browser.js';
 export { default as SM4 } from './sm4-browser.js';
 export * from './opk-client.js';

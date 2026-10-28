@@ -17,8 +17,6 @@ module.exports = {
     DoubleRatchet: 'readonly',
   },
   ignorePatterns: [
-    // Third-party vendored SM2 browser bundles — not our code, do not lint.
-    'src/crypto/sm2-browser*.js',
     '**/*.bundle.js',
     // Expo build outputs (gitignored, not source).
     'dist/',
