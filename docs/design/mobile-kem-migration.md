@@ -85,7 +85,7 @@ Rules
 
 Clean break must not become "silent break". The two failure modes the old code allowed are both closed here:
 
-- **Legacy public key presented for encapsulation.** The FIPS engine validates the encapsulation key before use (`validate_public_key` / modulus and encoding checks). A legacy `pk` fails that check **locally and loudly** with `InvalidEncapsulationKeyError`, instead of producing a ciphertext nobody can open. This is why the validation step is part of the engine boundary, not optional.
+- **Legacy public key presented for encapsulation.** Measured on 2026-10-29: a legacy `pk` **passes** the FIPS 203 §7.2 encoding checks. Both encodings are canonical 12-bit, so no structural validator can tell them apart — the earlier draft claimed otherwise and was wrong. A structural check still runs and rejects wrong lengths and non-canonical encodings with `InvalidEncapsulationKeyError`, but it is **not** the legacy detector. The legacy case is caught on the secret-key side by a functional probe (encapsulate → decapsulate against the key's own embedded `ek`), which raises `LegacyKemMaterialError`. Consequence: a legacy peer `pk` arriving from outside cannot be recognised before use; §2's assumption (mobile never published one) plus a version tag if publishing is ever added are the mitigations.
 - **Legacy ciphertext or stored legacy key encountered.** Raise `LegacyKemMaterialError` naming the source (`stored_identity`, `peer_payload`, `session_record`) and the byte length. Never attempt decapsulation, never return a derived key, never fall back.
 
 Rules
@@ -123,7 +123,7 @@ Rule: the claim and the engine land together. If the engine change is reverted, 
 ## 9. Test plan (CI gate, no network)
 
 1. **Oracle equivalence**: `generateKeypair` / `encapsulate` deterministic under injected randomness and byte-identical to `@noble/post-quantum` on at least 3 fixed seeds (harness already exists in the sandbox; port it).
-2. **Legacy `pk` is rejected locally**: feed a keypair produced by the old module into `encapsulate`; assert `InvalidEncapsulationKeyError` and assert no ciphertext is returned. Negative case, not a warning.
+2. **Legacy material is caught by function, not by structure**: assert that the legacy `pk` and the legacy `sk` both pass the FIPS encoding checks (this pins the measurement so the earlier wrong claim cannot come back), then assert the legacy keypair fails the encapsulate/decapsulate probe with `LegacyKemMaterialError`. Structurally invalid keys (wrong length, non-canonical encoding) still raise `InvalidEncapsulationKeyError` before any ciphertext is produced.
 3. **Legacy material fails loudly**: inject a stored legacy key and a session record marked with the old shape; assert `LegacyKemMaterialError` with the correct `source` value.
 4. **No dual engine**: a static/runtime assertion that no code path invokes more than one KEM implementation per handshake; deleting the legacy module must break the build if some path still imports it.
 5. **Storage migration**: an `IdentityMaterial` with a legacy keypair is rewritten exactly once; running twice is idempotent; the new key validates.
