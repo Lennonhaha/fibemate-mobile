@@ -1,12 +1,13 @@
 /**
  * Key management service for FIBEMATE Mobile.
- * ML-KEM-768 (FIPS 203) via pure-JS ml-kem-768.js
- * SM2 (GB/T 32918) via sm-crypto
+ * ML-KEM-768 (FIPS 203) via the vendored NTT-domain implementation in `crypto/kem`.
+ * SM2 (GB/T 32918) via sm-crypto.
  * expo-crypto for SHA-256 and secure random.
  */
 
 import * as Crypto from 'expo-crypto';
-import MLKEM768 from '../crypto/ml-kem-768';
+import { kem, ensureFipsIdentity, type EnsureResult } from '../crypto/kem';
+import { uuidToBase64url } from '../crypto/kem';
 import sm2 from 'sm-crypto/dist/sm2';
 
 export type KeyPair = {
@@ -16,6 +17,7 @@ export type KeyPair = {
 
 export type IdentityMaterial = {
   mlkem: {
+    version: string;    // 'v2_fips' for keys written by this build
     publicKey: string;  // base64url, 1184 bytes
     privateKey: string; // base64url
   };
@@ -24,14 +26,8 @@ export type IdentityMaterial = {
     privateKey: string; // hex, 64 chars
   };
   createdAt: string;
+  kemRotatedAt?: string;
 };
-
-function uint8ArrayToBase64url(arr: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
-  const b64 = btoa(binary);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]+$/, '');
-}
 
 // ---- SM2 key generation ----
 
@@ -46,22 +42,24 @@ export function generateSM2KeyPair(): KeyPair {
 // ---- ML-KEM-768 key generation ----
 
 async function generateMLKEMKeyPair(): Promise<KeyPair> {
-  const kp = MLKEM768.generateKeypair();
+  const kp = kem.generateKeypair();
+  // Fail here rather than at handshake time if the engine cannot round-trip its own key.
+  kem.assertFipsCapable(kp.secretKey);
   return {
-    publicKey: uint8ArrayToBase64url(kp.publicKey),
-    privateKey: uint8ArrayToBase64url(kp.secretKey),
+    publicKey: uuidToBase64url(kp.publicKey),
+    privateKey: uuidToBase64url(kp.secretKey),
   };
 }
 
 // ---- Identity generation ----
 
 export async function generateIdentity(): Promise<IdentityMaterial> {
-  const [mlkem, sm2kp] = await Promise.all([
+  const [mlkemKeys, sm2kp] = await Promise.all([
     generateMLKEMKeyPair(),
     Promise.resolve(generateSM2KeyPair()),
   ]);
   return {
-    mlkem,
+    mlkem: { version: kem.version, ...mlkemKeys },
     sm2: sm2kp,
     createdAt: new Date().toISOString(),
   };
@@ -74,16 +72,40 @@ export function serializeIdentity(km: IdentityMaterial): string {
     mlkem: km.mlkem,
     sm2: km.sm2,
     createdAt: km.createdAt,
+    ...(km.kemRotatedAt ? { kemRotatedAt: km.kemRotatedAt } : {}),
   });
 }
 
 export function deserializeIdentity(raw: string): IdentityMaterial {
   const obj = JSON.parse(raw);
   return {
-    mlkem: obj.mlkem,
+    // Records written before the clean break carry no version field; label them as what
+    // they are instead of letting callers assume FIPS 203.
+    mlkem: { version: obj?.mlkem?.version ?? 'v1_legacy', ...obj?.mlkem },
     sm2: obj.sm2,
     createdAt: obj.createdAt,
+    ...(obj.kemRotatedAt ? { kemRotatedAt: obj.kemRotatedAt } : {}),
   };
+}
+
+/**
+ * Rotates a stored identity to the FIPS 203 engine if needed, persisting the result.
+ *
+ * `persist` is the caller's storage write; passing it in keeps this module free of the
+ * secure-storage backend so it can be tested outside React Native.
+ */
+export async function rotateIdentityIfNeeded(
+  raw: string | null,
+  persist: (next: string) => Promise<void>,
+  now: () => string = () => new Date().toISOString(),
+): Promise<EnsureResult> {
+  // `identity.js` is plain CJS, so TypeScript widens `reason`/`version` to `string`.
+  // The runtime values are exactly the literals declared by `EnsureResult`.
+  const result = ensureFipsIdentity(raw, now) as EnsureResult;
+  if (result.rotated && result.raw) {
+    await persist(result.raw);
+  }
+  return result;
 }
 
 // ---- Random utilities ----

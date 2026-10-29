@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import sm2 from 'sm-crypto/dist/sm2';
 import { SecureKeyStore } from '../services/storage';
-import { deserializeIdentity } from '../services/keyService';
+import { deserializeIdentity, rotateIdentityIfNeeded } from '../services/keyService';
 import * as RegClient from '../services/regClient';
 import { ensureOpkPool } from '../services/opkService';
 import { Platform } from 'react-native';
@@ -57,12 +57,17 @@ export default function MessageScreen() {
 
   // ---- 初始化 ----
   const init = useCallback(async () => {
-    const raw = await SecureKeyStore.loadIdentity();
-    if (!raw) {
+    const stored = await SecureKeyStore.loadIdentity();
+    if (!stored) {
       setHasIdentity(false);
       return;
     }
-    const id = deserializeIdentity(raw);
+    // Same one-time rotation as KeysScreen; whichever screen mounts first performs it.
+    const { raw: rotatedRaw } = await rotateIdentityIfNeeded(
+      stored,
+      (next) => SecureKeyStore.storeIdentity(next),
+    );
+    const id = deserializeIdentity(rotatedRaw ?? stored);
     setMyPrivKey(id.sm2.privateKey);
     setHasIdentity(true);
 

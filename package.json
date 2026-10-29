@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~57.0.17",
     "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.4.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.21.0",
     "@react-navigation/native": "^7.3.7",
@@ -23,6 +24,7 @@
     "sm-crypto": "^0.5.0"
   },
   "devDependencies": {
+    "@noble/post-quantum": "^0.7.1",
     "@react-native/eslint-config": "0.87.1",
     "@types/react": "~19.2.4",
     "eslint": "^8.19.0",

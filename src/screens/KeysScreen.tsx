@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SecureKeyStore } from '../services/storage';
 import {
-  generateIdentity, serializeIdentity, deserializeIdentity,
+  generateIdentity, serializeIdentity, deserializeIdentity, rotateIdentityIfNeeded,
 } from '../services/keyService';
 import {
   getLocalOPKCount, initOPKPool,
@@ -25,6 +25,7 @@ export default function KeysScreen() {
   const [loading, setLoading] = useState(true);
   const [genState, setGenState] = useState<GenState>('idle');
   const [createdAt, setCreatedAt] = useState<string | null>(null);
+  const [kemVersion, setKemVersion] = useState<string | null>(null);
   const [opkCount, setOpkCount] = useState<number>(0);
 
   const checkIdentity = useCallback(async () => {
@@ -32,9 +33,16 @@ export default function KeysScreen() {
     try {
       const raw = await SecureKeyStore.loadIdentity();
       if (raw) {
-        deserializeIdentity(raw); // validate
+        // Pre-clean-break records have no kem.version; rotate them once and persist.
+        const { raw: rotatedRaw } = await rotateIdentityIfNeeded(
+          raw,
+          (next) => SecureKeyStore.storeIdentity(next),
+        );
+        const effective = rotatedRaw ?? raw;
+        const id = deserializeIdentity(effective); // validate
         setHasIdentity(true);
-        setCreatedAt(JSON.parse(raw).createdAt);
+        setCreatedAt(id.createdAt);
+        setKemVersion(id.mlkem.version);
         const count = await getLocalOPKCount();
         setOpkCount(count);
       } else {
@@ -108,7 +116,10 @@ export default function KeysScreen() {
 
             {/* ML-KEM-768 */}
             <Text style={styles.sectionTitle}>ML-KEM-768（FIPS 203）</Text>
-            <InfoCard label="算法" value="ML-KEM-768 · FIPS 203" />
+            <InfoCard
+              label="算法"
+              value={`ML-KEM-768 · ${kemVersion === 'v2_fips' ? 'FIPS 203 (v2_fips)' : '密钥待轮换'}`}
+            />
             <InfoCard label="用途" value="密钥封装（KEX）" />
             <InfoCard label="公钥格式" value="base64url · 1184 bytes" />
 
